@@ -3,4 +3,6 @@ uvicorn[standard]
 python-multipart
 PyMuPDF
 python-docx
-
+spacy
+transformers
+torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu

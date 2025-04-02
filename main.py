@@ -5,6 +5,10 @@ import re
 import spacy
 import json
 from collections import defaultdict
+from transformers import pipeline
+
+# Load Hugging Face zero-shot classification model
+classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
 
 app = FastAPI()
 nlp = spacy.load('en_core_web_sm')
@@ -29,8 +33,12 @@ def extract_email(text):
 def extract_phone(text):
     return re.findall(r'\+?\d[\d\s-]{8,}\d', text)
 
-def extract_skills(text):
-    return [skill for skill in skills_set if re.search(r'\b'+re.escape(skill.lower())+r'\b', text.lower())]
+def extract_skills_transformer(text, candidate_labels, threshold=0.5):
+    result = classifier(text, candidate_labels, multi_label=True)
+    relevant_skills = [
+        label for label, score in zip(result['labels'], result['scores']) if score >= threshold
+    ]
+    return relevant_skills
 
 def extract_education(text):
     keywords = ['Bachelor', 'Master', 'B.Tech', 'M.Tech', 'PhD', 'University', 'College', 'Diploma']
@@ -39,12 +47,19 @@ def extract_education(text):
     return [sentence for sentence in sentences if any(keyword.lower() in sentence.lower() for keyword in keywords)]
 
 
+with open('skills.json', 'r') as f:
+    skills_set = json.load(f)
+
 @app.post("/parse_resume/")
 async def parse_resume(file: UploadFile = File(...)):
-    text = extract_text(file)
-    parsed_data = defaultdict(list)
-    parsed_data['email'] = extract_email(text)
-    parsed_data['phone'] = extract_phone(text)
-    parsed_data['skills'] = extract_skills(text)
-    parsed_data['education'] = extract_education(text)
-    return parsed_data
+    try:
+        text = extract_text(file)
+        parsed_data = defaultdict(list)
+        parsed_data['email'] = extract_email(text)
+        parsed_data['phone'] = extract_phone(text)
+        parsed_data['skills'] = extract_skills_transformer(text, skills_set)
+        parsed_data['education'] = extract_education(text)
+        return parsed_data
+    except Exception as e:
+        print(f"Error occurred: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
