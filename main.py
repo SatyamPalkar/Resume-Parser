@@ -34,8 +34,10 @@ def extract_skills(text):
 
 def extract_education(text):
     keywords = ['Bachelor', 'Master', 'B.Tech', 'M.Tech', 'PhD', 'University', 'College', 'Diploma']
-    sentences = [sent.string.strip() for sent in nlp(text).sents]
+    doc = nlp(text)
+    sentences = [sent.text.strip() for sent in doc.sents]
     return [sentence for sentence in sentences if any(keyword.lower() in sentence.lower() for keyword in keywords)]
+
 
 @app.post("/parse_resume/")
 async def parse_resume(file: UploadFile = File(...)):
